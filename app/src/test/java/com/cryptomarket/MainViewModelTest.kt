@@ -1,53 +1,92 @@
 package com.cryptomarket
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import com.cryptomarket.model.CryptoAsset
-import com.cryptomarket.model.CryptoAssetDetails
+import androidx.lifecycle.Observer
+import com.cryptomarket.model.Markets
 import com.cryptomarket.viewmodel.MainViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
-import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
+import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
+import org.mockito.Mock
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.mockito.MockitoAnnotations
+import org.mockito.junit.MockitoJUnitRunner
+import java.net.HttpURLConnection
 
 
-@ExperimentalCoroutinesApi
+@RunWith(MockitoJUnitRunner::class)
 class MainViewModelTest {
 
     @get:Rule
     val testInstantTaskExecutorRule: TestRule = InstantTaskExecutorRule()
 
-    @ExperimentalCoroutinesApi
-    @get:Rule
-    var mainCoroutineRule = MainCoroutineRule()
-
     private lateinit var mainViewModel: MainViewModel
+    private lateinit var mockWebServer: MockWebServer
 
+    @Mock
+    private lateinit var cryptoAssetsDataObserver: Observer<Markets>
+
+    @Mock
+    private lateinit var cryptoAssetsErrorObserver: Observer<String>
 
     @Before
     fun setUp() {
+        MockitoAnnotations.initMocks(this)
         mainViewModel = MainViewModel()
+        mainViewModel.cryptoAssetsData.observeForever(cryptoAssetsDataObserver)
+        mainViewModel.cryptoAssetsDataError.observeForever(cryptoAssetsErrorObserver)
+        mockWebServer = MockWebServer()
+        mockWebServer.start()
     }
 
     @Test
     fun testGetAssetInfo(){
         // Assign
+        val response = MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(getCryptoMarketDataJson)
+        mockWebServer.enqueue(response)
 
         // Act
         mainViewModel.getCryptoAsset()
+        mockWebServer.takeRequest()
 
         // Assert
-        mainViewModel.cryptoAssetsData.observeForTesting {
-            val cryptoAsset: CryptoAsset? = mainViewModel.cryptoAssetsData.value
-            assertNotNull(cryptoAsset)
+        val captor = ArgumentCaptor.forClass(Markets::class.java)
+        captor.run {
+            verify(cryptoAssetsDataObserver, times(1)).onChanged(capture())
+        }
+    }
+
+    @Test
+    fun testGetAssetInfoError(){
+        // Assign
+        val response = MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("")
+        mockWebServer.enqueue(response)
+
+        // Act
+        mainViewModel.getCryptoAsset()
+        mockWebServer.takeRequest()
+
+        // Assert
+        val captor = ArgumentCaptor.forClass(Markets::class.java)
+        captor.run {
+            verify(cryptoAssetsErrorObserver, times(1)).onChanged(capture().toString())
         }
     }
 
     @After
     fun tearDown() {
-
+        mockWebServer.shutdown()
     }
 }
 

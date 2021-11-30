@@ -1,36 +1,19 @@
 package com.cryptomarket.viewmodel
 
-import android.util.Log
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.cryptomarket.model.CryptoAsset
-import com.cryptomarket.network.CryptoApi
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import androidx.lifecycle.liveData
+import com.cryptomarket.repository.CryptoAssetRepository
+import com.cryptomarket.utils.Resource
+import kotlinx.coroutines.Dispatchers
 
-class MainViewModel : ViewModel() {
+class MainViewModel(private val cryptoAssetRepository: CryptoAssetRepository) : ViewModel() {
 
-    private val TAG = "MainViewModel"
-    var cryptoAssetsData = MutableLiveData<CryptoAsset>()
-    var cryptoAssetsDataError = MutableLiveData<String>()
-
-    fun getCryptoAsset() {
-        val api = CryptoApi.retrofitService.getAssetInfo()
-
-        api.enqueue(object: Callback<CryptoAsset> {
-            override fun onResponse(call: Call<CryptoAsset>, response: Response<CryptoAsset>) {
-                if(response.body() == null) {
-                    cryptoAssetsDataError.value = "Something went wrong! \nPlease try again"
-                } else {
-                    cryptoAssetsData.value = response.body()
-                }
-            }
-
-            override fun onFailure(call: Call<CryptoAsset>, t: Throwable) {
-                cryptoAssetsDataError.value = "Unable to fetch data! \nPlease try again"
-                Log.d(TAG, "Api Failure :" + t.message)
-            }
-        })
+    fun getCryptoAssetsDetails() = liveData(Dispatchers.IO) {
+        emit(Resource.loading(data = null))
+        try {
+            emit(Resource.success(cryptoAssetRepository.getCryptoAsserts()))
+        } catch (exception: Exception) {
+            emit(Resource.error(data = null, exception.message ?: "Something went wrong!"))
+        }
     }
 }
