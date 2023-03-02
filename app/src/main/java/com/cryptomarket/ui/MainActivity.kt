@@ -10,30 +10,29 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.cryptomarket.R
 import com.cryptomarket.adapter.CryptoAssetsAdapter
+import com.cryptomarket.databinding.MainActivityBinding
 import com.cryptomarket.model.Market
 import com.cryptomarket.network.CryptoAssetRetrofitBuilder
 import com.cryptomarket.network.CryptoAssetServiceHelper
-import com.cryptomarket.utils.CustomViewModelFactory
+import com.cryptomarket.repository.CryptoAssetRepository
 import com.cryptomarket.utils.Status
 import com.cryptomarket.viewmodel.MainViewModel
-import kotlinx.android.synthetic.main.main_activity.progressBar
-import kotlinx.android.synthetic.main.main_activity.recyclerView
-import kotlinx.android.synthetic.main.main_activity.errorText
-import kotlinx.android.synthetic.main.main_activity.main_toolbar
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewModel: MainViewModel
     private lateinit var adapter: CryptoAssetsAdapter
+    private var binding: MainActivityBinding? = null
+
+    private fun requireBinding() = requireNotNull(binding)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.main_activity)
-
-        setSupportActionBar(main_toolbar)
+        binding = MainActivityBinding.inflate(layoutInflater)
+        setContentView(binding?.root)
+        setSupportActionBar(binding?.mainToolbar)
         setupViewModel()
         setupUI()
         setupObservers()
@@ -51,46 +50,58 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        binding = null
+    }
+
     private fun setupViewModel() {
-        viewModel = ViewModelProvider(this,
-            CustomViewModelFactory(CryptoAssetServiceHelper(CryptoAssetRetrofitBuilder.apiService)
-            ))[MainViewModel::class.java]
+//        viewModel = ViewModelProvider(this,
+//            CustomViewModelFactory(CryptoAssetServiceHelper(CryptoAssetRetrofitBuilder.apiService)
+//            ))[MainViewModel::class.java]
+
+        val cryptoAssetRepository = CryptoAssetRepository(CryptoAssetServiceHelper(
+            CryptoAssetRetrofitBuilder.apiService))
+        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
+        viewModel.init(cryptoAssetRepository)
     }
 
     private fun setupUI() {
-        recyclerView.layoutManager = GridLayoutManager(this, 2)
+        val binding = requireBinding()
+        binding.recyclerView.layoutManager = GridLayoutManager(this, 2)
         adapter = CryptoAssetsAdapter(arrayListOf())
-        recyclerView.addItemDecoration(
+        binding.recyclerView.addItemDecoration(
             DividerItemDecoration(
-                recyclerView.context,
-                (recyclerView.layoutManager as GridLayoutManager).orientation
+                binding.recyclerView.context,
+                (binding.recyclerView.layoutManager as GridLayoutManager).orientation
             )
         )
-        recyclerView.adapter = adapter
+        binding.recyclerView.adapter = adapter
     }
 
     private fun setupObservers() {
+        val binding = requireBinding()
         viewModel.getCryptoAssetsDetails().observe(this, Observer {
             it?.let { resource ->
                 when (resource.status) {
                     Status.SUCCESS -> {
-                        recyclerView.visibility = View.VISIBLE
-                        progressBar.visibility = View.GONE
-                        errorText.visibility = View.GONE
+                        binding.recyclerView.visibility = View.VISIBLE
+                        binding.progressBar.visibility = View.GONE
+                        binding.errorText.visibility = View.GONE
                         resource.data?.let { market ->
                             retrieveList(market.markets)
                         }
                     }
                     Status.ERROR -> {
-                        recyclerView.visibility = View.VISIBLE
-                        progressBar.visibility = View.GONE
-                        errorText.visibility = View.VISIBLE
+                        binding.recyclerView.visibility = View.VISIBLE
+                        binding.progressBar.visibility = View.GONE
+                        binding.errorText.visibility = View.VISIBLE
                         Toast.makeText(this, it.message, Toast.LENGTH_LONG).show()
                     }
                     Status.LOADING -> {
-                        progressBar.visibility = View.VISIBLE
-                        recyclerView.visibility = View.GONE
-                        errorText.visibility = View.GONE
+                        binding.progressBar.visibility = View.VISIBLE
+                        binding.recyclerView.visibility = View.GONE
+                        binding.errorText.visibility = View.GONE
                     }
                 }
             }
